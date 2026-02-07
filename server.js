@@ -5,7 +5,7 @@ const path = require('path');
 const cors = require('cors');
 const multer = require('multer');
 const fs = require('fs');
-require('dotenv').config();
+const dotenv = require('dotenv').config();
 
 // ===== ADD =====
 const PORT = process.env.PORT || 3000;
