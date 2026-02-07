@@ -5,7 +5,6 @@ const path = require('path');
 const cors = require('cors');
 const multer = require('multer');
 const fs = require('fs');
-const dotenv = require('dotenv').config();
 
 // ===== ADD =====
 const PORT = process.env.PORT || 3000;
@@ -47,53 +46,33 @@ const upload = multer({
 });
 
 // ---------- DB ----------
-const dbConfig = { 
-    host: process.env.DB_HOST || 'localhost', 
-    user: process.env.DB_USER || 'root', 
-    password: process.env.DB_PASS || '', 
-    database: process.env.DB_NAME || 'smart_meeting',
-    port: process.env.DB_PORT || 3306,
-    connectTimeout: 10000,
-    ssl: { rejectUnauthorized: false }
-};
 const db = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASS,
-  database: process.env.DB_NAME,
-  port: process.env.DB_PORT,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-  ssl: { rejectUnauthorized: false }
+    host: process.env.DB_HOST || 'mysql-2243ea6c-smartmeeting.j.aivencloud.com',
+    user: process.env.DB_USER || 'avnadmin',
+    password: process.env.DB_PASS || '""',
+    database: process.env.DB_NAME || 'smart_meeting',
+    port: process.env.DB_PORT || 28535,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+    ssl: { rejectUnauthorized: false }
 });
 
-// ===== ADD AUTO RECONNECT =====
-function handleDisconnect() {
-    db = mysql.createConnection(dbConfig);
-
-    db.connect(function(err) {
-        if (err) {
-            console.log('❌ error when connecting to db:', err);
-            setTimeout(handleDisconnect, 2000);
-        }
-    });
-
-    db.on('error', function(err) {
-        console.log('❌ db error', err);
-        if (err.code === 'PROTOCOL_CONNECTION_LOST') {
-            handleDisconnect();
-        } else {
-            throw err;
-        }
-    });
-}
-handleDisconnect();
-// ===== ADD CHECK ENV =====
 console.log("DB_HOST =", process.env.DB_HOST);
 console.log("DB_USER =", process.env.DB_USER);
 console.log("DB_NAME =", process.env.DB_NAME);
 console.log("DB_PORT =", process.env.DB_PORT);
+
+// ===== AIVEN CONNECT TEST =====
+db.getConnection((err, conn) => {
+    if (err) {
+        console.error('❌ AIVEN MYSQL CONNECT ERROR:', err);
+    } else {
+        console.log('✅ AIVEN MYSQL CONNECTED');
+        conn.release();
+    }
+});
+
 // ---------- AUTH ----------
 app.post('/api/register', (req, res) => {
     const { username, password, fullname, email } = req.body;
@@ -293,19 +272,11 @@ process.on('unhandledRejection', err => {
     console.error('❌ Rejection:', err);
 });
 
-
 // ===== FIX FOR RENDER (ADD ONLY) =====
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
-db.connect((err) => {
-    if (err) {
-        console.error("❌ DB ERROR:", err);
-        return;
-    }
-    console.log('✅ Database Connected');
-});
-// ✅ IMPORTANT FIX
+
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server Ready at http://localhost:${PORT}`);
 });
