@@ -28,7 +28,6 @@
 </head>
 <body class="h-screen overflow-hidden text-gray-700 bg-gray-50">
     <script>
-        // ใช้ URL Online เพื่อดึงข้อมูลเก่ากลับมา
         const API_BASE_URL = 'https://webappmeeting-fixenv.onrender.com/api'; 
     </script>
     
@@ -378,18 +377,23 @@
             location.reload();
         }
 
+        // --- UTILS FOR AVATAR ---
+        function getAvatarUrl(user) {
+            if (user.avatar && user.avatar !== 'default.png') {
+                return `${API_BASE_URL.replace('/api', '')}/uploads/${user.avatar}`;
+            }
+            // ใช้ UI Avatar เป็น default ถ้าไม่มีรูป หรือเป็น default.png แต่ไฟล์หาไม่เจอ (เผื่อไว้)
+            return `https://ui-avatars.com/api/?name=${user.fullname}&background=random&color=fff`;
+        }
+
         // --- UI & DATA FETCHING ---
         async function initUI() {
             $('authSection').classList.add('hidden-section');
             $('appSection').classList.remove('hidden-section');
             
             // Profile setup
-            const avatarUrl = currentUser.avatar && currentUser.avatar !== 'default.png' 
-                ? `${API_BASE_URL.replace('/api','')}/uploads/${currentUser.avatar}` 
-                : `https://ui-avatars.com/api/?name=${currentUser.fullname}&background=random&color=fff`;
-            
             $('sideName').innerText = currentUser.fullname;
-            $('sideAvatar').src = avatarUrl;
+            $('sideAvatar').src = getAvatarUrl(currentUser);
 
             const roleEl = $('sideRole');
             if(currentUser.role === 'admin') {
@@ -654,17 +658,13 @@
         }
         
         function renderProfile() {
-            const avatarUrl = currentUser.avatar && currentUser.avatar !== 'default.png' 
-                ? `${API_BASE_URL.replace('/api','')}/uploads/${currentUser.avatar}` 
-                : `https://ui-avatars.com/api/?name=${currentUser.fullname}&background=random&color=fff`;
-
             let html = `
             <div class="max-w-2xl mx-auto bg-white rounded-3xl shadow-sm border p-8 fade-in">
                 <h3 class="font-bold text-2xl mb-6 text-gray-800">ตั้งค่าโปรไฟล์</h3>
                 
                 <div class="flex flex-col items-center mb-8">
                     <div class="relative group">
-                        <img id="previewAvatar" src="${avatarUrl}" class="w-32 h-32 rounded-full object-cover border-4 border-indigo-50 shadow-lg">
+                        <img id="previewAvatar" src="${getAvatarUrl(currentUser)}" class="w-32 h-32 rounded-full object-cover border-4 border-indigo-50 shadow-lg">
                         <label for="uploadAvatar" class="absolute bottom-0 right-0 w-10 h-10 bg-indigo-600 text-white rounded-full flex items-center justify-center cursor-pointer shadow hover:bg-indigo-700 transition">
                             <i class="fas fa-camera"></i>
                         </label>
@@ -789,7 +789,7 @@
                     <div class="absolute top-0 left-0 w-1 h-full bg-orange-400"></div>
                     <div class="flex justify-between items-start mb-4">
                         <div class="flex items-center gap-3">
-                            <img src="${b.avatar ? `${API_BASE_URL.replace('/api','')}/uploads/${b.avatar}` : `https://ui-avatars.com/api/?name=${b.fullname}&background=random`}" class="w-10 h-10 rounded-full border object-cover">
+                            <img src="${getAvatarUrl(b)}" class="w-10 h-10 rounded-full border object-cover">
                             <div>
                                 <p class="text-sm font-bold text-gray-800">${b.fullname}</p>
                                 <p class="text-xs text-gray-500">User ID: ${b.user_id}</p>
@@ -871,7 +871,7 @@
                                     <tr class="hover:bg-slate-50">
                                         <td class="p-4 pl-6 flex items-center gap-3">
                                             <div class="w-10 h-10 rounded-full bg-gray-200 overflow-hidden">
-                                                <img src="${u.avatar && u.avatar != 'default.png' ? `${API_BASE_URL.replace('/api','')}/uploads/${u.avatar}` : `https://ui-avatars.com/api/?name=${u.fullname}`}" class="w-full h-full object-cover">
+                                                <img src="${getAvatarUrl(u)}" class="w-full h-full object-cover">
                                             </div>
                                             <span class="font-bold text-gray-700">${u.fullname}</span>
                                         </td>
