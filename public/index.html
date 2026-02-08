@@ -28,6 +28,7 @@
 </head>
 <body class="h-screen overflow-hidden text-gray-700 bg-gray-50">
     <script>
+        // URL ของ Server Online (Render)
         const API_BASE_URL = 'https://webappmeeting-fixenv.onrender.com/api'; 
     </script>
     
@@ -382,7 +383,7 @@
             if (user.avatar && user.avatar !== 'default.png') {
                 return `${API_BASE_URL.replace('/api', '')}/uploads/${user.avatar}`;
             }
-            // ใช้ UI Avatar เป็น default ถ้าไม่มีรูป หรือเป็น default.png แต่ไฟล์หาไม่เจอ (เผื่อไว้)
+            // ใช้ UI Avatar เป็น default ถ้าไม่มีรูป
             return `https://ui-avatars.com/api/?name=${user.fullname}&background=random&color=fff`;
         }
 
@@ -588,6 +589,9 @@
                     <div id="calendar" class="flex-1"></div>
                 </div>`;
             
+            // --- FILTER LOGIC ---
+            // ถ้า User: กรองเอาแค่ของตัวเอง
+            // ถ้า Admin: เอาทั้งหมด
             let displayEvents = allBookings;
             if (currentUser.role !== 'admin') {
                 displayEvents = allBookings.filter(b => b.user_id === currentUser.id);
@@ -928,6 +932,7 @@
         async function confirmBooking(roomId, roomName) {
             const topic = $('bkTopic').value;
             const startStr = $('bkStart').value;
+            const duration = $('bkDuration').value;
             const people = $('bkPeople').value;
             const fileInput = $('bkFile');
             const equipment = [...document.querySelectorAll('.equip input:checked')].map(e=>e.value).join(', ');
@@ -950,6 +955,7 @@
             formData.append('roomId', roomId);
             formData.append('topic', topic);
             formData.append('start', startStr);
+            formData.append('duration', duration);
             formData.append('people', people);
             formData.append('equipment', equipment);
 
