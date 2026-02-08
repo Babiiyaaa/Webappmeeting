@@ -6,11 +6,14 @@ const cors = require('cors');
 const multer = require('multer');
 const fs = require('fs');
 
-// Config
+// ===== ADD =====
 const PORT = process.env.PORT || 3000;
+
 const app = express();
 
+// ===== ADD =====
 app.set('trust proxy', true);
+
 app.use(cors({ 
     origin: true, 
     credentials: true,
@@ -18,24 +21,31 @@ app.use(cors({
 }));
 
 app.use(bodyParser.json());
+
+// ===== ADD =====
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Static Files
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
-// Upload Setup
+// ---------- Upload ----------
 if (!fs.existsSync('./public/uploads')) fs.mkdirSync('./public/uploads', { recursive: true });
+
 const storage = multer.diskStorage({
     destination: (_, __, cb) => cb(null, './public/uploads'),
     filename: (_, file, cb) => cb(null, Date.now() + path.extname(file.originalname))
 });
+
 const upload = multer({ 
     storage,
-    limits: { fileSize: 10 * 1024 * 1024 } // Limit 10MB
+    limits:{fileSize:10*1024*1024},
+    fileFilter:(_,file,cb)=>{
+        const ok = /pdf|doc|docx|jpg|png/.test(file.mimetype);
+        cb(null,ok);
+    }
 });
 
-// Database Connection
+// ---------- DB ----------
 const db = mysql.createPool({
     host: process.env.DB_HOST || 'mysql-2243ea6c-smartmeeting.j.aivencloud.com',
     user: process.env.DB_USER || 'avnadmin',
@@ -44,25 +54,38 @@ const db = mysql.createPool({
     port: process.env.DB_PORT || 28535,
     waitForConnections: true,
     connectionLimit: 10,
-    ssl: { rejectUnauthorized: false },
-    timezone: '+07:00' // Important for Thailand Time
+    queueLimit: 0,
+    ssl: { rejectUnauthorized: false }
 });
 
-// ================= API ROUTES =================
+console.log("DB_HOST =", process.env.DB_HOST);
+console.log("DB_USER =", process.env.DB_USER);
+console.log("DB_NAME =", process.env.DB_NAME);
+console.log("DB_PORT =", process.env.DB_PORT);
 
-// --- 1. AUTHENTICATION (Login, Register, Reset) ---
+// ===== AIVEN CONNECT TEST =====
+db.getConnection((err, conn) => {
+    if (err) {
+        console.error('❌ AIVEN MYSQL CONNECT ERROR:', err);
+    } else {
+        console.log('✅ AIVEN MYSQL CONNECTED');
+        conn.release();
+    }
+});
 
+// ---------- AUTH ----------
 app.post('/api/register', (req, res) => {
     const { username, password, fullname, email } = req.body;
+
     db.query('SELECT id FROM users WHERE username = ?', [username], (err, rows) => {
-        if (err) return res.status(500).json({ success: false, message: err.message });
-        if (rows.length > 0) return res.json({ success: false, message: 'Username นี้ถูกใช้แล้ว' });
+        if (err) return res.json({ success: false, message: err.message });
+        if (rows.length > 0) return res.json({ success: false, message: 'Username ซ้ำ' });
 
         db.query(
             'INSERT INTO users (username,password,fullname,email,role) VALUES (?,?,?,?, "user")',
             [username, password, fullname, email],
             err2 => {
-                if (err2) return res.status(500).json({ success: false, message: err2.message });
+                if (err2) return res.json({ success: false, message: err2.message });
                 return res.json({ success: true });
             }
         );
@@ -71,11 +94,15 @@ app.post('/api/register', (req, res) => {
 
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
-    db.query('SELECT * FROM users WHERE username = ? AND password = ?', [username, password], (err, rows) => {
-        if (err) return res.status(500).json({ success: false, message: 'DB Error' });
-        if (!rows.length) return res.json({ success: false, message: 'รหัสผ่านผิด' });
-        return res.json({ success: true, user: rows[0] });
-    });
+    db.query(
+        'SELECT * FROM users WHERE username = ? AND password = ?',
+        [username, password],
+        (err, rows) => {
+            if (err) return res.json({ success: false, message: err.message });
+            if (!rows.length) return res.json({ success: false, message: 'รหัสผ่านผิด' });
+            return res.json({ success: true, user: rows[0] });
+        }
+    );
 });
 
 app.post('/api/reset-password', (req, res) => {
@@ -85,14 +112,12 @@ app.post('/api/reset-password', (req, res) => {
         [newPassword, username, email],
         (err, r) => {
             if (err) return res.json({ success: false });
-            if (r.affectedRows === 0) return res.json({ success: false, message: 'ไม่พบข้อมูลผู้ใช้หรืออีเมลไม่ถูกต้อง' });
-            return res.json({ success: true });
+            return res.json({ success: r.affectedRows > 0 });
         }
     );
 });
 
-// --- 2. USER PROFILE ---
-
+// ---------- CORE ----------
 app.post('/api/profile', upload.single('avatar'), (req, res) => {
     const { id, fullname, password } = req.body;
     let sql = 'UPDATE users SET fullname=?, password=?';
@@ -114,40 +139,37 @@ app.post('/api/profile', upload.single('avatar'), (req, res) => {
     });
 });
 
-// --- 3. BOOKINGS ---
+// ---------- BOOKING + FILE ----------
+app.post('/api/book', upload.single('document'), (req, res) => {
+    const { userId, roomId, start, topic } = req.body;
+    const file = req.file ? req.file.filename : null;
+
+    const s = new Date(start);
+    const e = new Date(s.getTime() + 3600000);
+    const f = d => d.toISOString().slice(0, 19).replace('T', ' ');
+
+    db.query(
+        'INSERT INTO bookings (user_id,room_id,start_time,end_time,topic,status,document) VALUES (?,?,?,?,?, "pending", ?)',
+        [userId, roomId, f(s), f(e), topic, file],
+        err => {
+            if (err) return res.json({ success: false, message: err.message });
+            return res.json({ success: true });
+        }
+    );
+});
 
 app.get('/api/bookings', (req, res) => {
     const sql = `
-        SELECT b.*, r.name as room_name, u.fullname, u.avatar 
+        SELECT b.*, r.name room_name, u.fullname
         FROM bookings b
-        LEFT JOIN rooms r ON b.room_id = r.id
-        LEFT JOIN users u ON b.user_id = u.id
+        LEFT JOIN rooms r ON b.room_id=r.id
+        LEFT JOIN users u ON b.user_id=u.id
         ORDER BY b.start_time DESC
     `;
     db.query(sql, (err, rows) => {
         if (err) return res.json([]);
         return res.json(rows);
     });
-});
-
-app.post('/api/book', upload.single('document'), (req, res) => {
-    const { userId, roomId, start, topic, people, equipment } = req.body; // รับ equipment เพิ่ม
-    const file = req.file ? req.file.filename : null;
-
-    // Logic: Start Time is provided. End time defaults to Start + 2 Hours
-    const startDate = new Date(start);
-    const endDate = new Date(startDate.getTime() + (2 * 60 * 60 * 1000)); 
-
-    const format = d => d.toISOString().slice(0, 19).replace('T', ' ');
-
-    db.query(
-        'INSERT INTO bookings (user_id, room_id, start_time, end_time, topic, status, document, attendees, equipment) VALUES (?,?,?,?,?, "pending", ?, ?, ?)',
-        [userId, roomId, format(startDate), format(endDate), topic, file, people || 5, equipment || ''],
-        err => {
-            if (err) return res.status(500).json({ success: false, message: err.message });
-            return res.json({ success: true });
-        }
-    );
 });
 
 app.delete('/api/bookings/:id', (req, res) => {
@@ -157,16 +179,55 @@ app.delete('/api/bookings/:id', (req, res) => {
     });
 });
 
-// --- 4. ADMIN & MANAGEMENT ---
-
-app.put('/api/admin/bookings/:id', (req, res) => {
-    db.query('UPDATE bookings SET status=? WHERE id=?', [req.body.status, req.params.id], err => {
-        if (err) return res.json({ success: false });
-        return res.json({ success: true });
+// ---------- AI ----------
+app.post('/api/ai/recommend', (req, res) => {
+    const { attendees, needProjector } = req.body;
+    db.query('SELECT * FROM rooms WHERE status="active"', (err, rooms) => {
+        if (err) return res.json([]);
+        const ranked = rooms
+            .map(r => {
+                let score = 0;
+                if (r.capacity < attendees) return null;
+                score += (attendees / r.capacity) * 50;
+                if (needProjector && (r.facilities || '').includes('Projector')) score += 30;
+                return { ...r, score };
+            })
+            .filter(Boolean)
+            .sort((a, b) => b.score - a.score);
+        return res.json(ranked);
     });
 });
 
-app.get('/api/admin/rooms', (req, res) => {
+// ---------- ADMIN ----------
+app.put('/api/admin/bookings/:id', (req, res) => {
+    db.query(
+        'UPDATE bookings SET status=? WHERE id=?',
+        [req.body.status, req.params.id],
+        err => {
+            if (err) return res.json({ success: false });
+            return res.json({ success: true });
+        }
+    );
+});
+
+app.get('/api/admin/users', (_, res) => {
+    db.query('SELECT * FROM users', (err, rows) => {
+        if (err) return res.json([]);
+        return res.json(rows);
+    });
+});
+
+app.delete('/api/admin/users/:id', (req, res) => {
+    db.query('DELETE FROM bookings WHERE user_id=?', [req.params.id], err => {
+        if (err) return res.json({ success: false });
+        db.query('DELETE FROM users WHERE id=?', [req.params.id], err2 => {
+            if (err2) return res.json({ success: false });
+            return res.json({ success: true });
+        });
+    });
+});
+
+app.get('/api/admin/rooms', (_, res) => {
     db.query('SELECT * FROM rooms', (err, rows) => {
         if (err) return res.json([]);
         return res.json(rows);
@@ -182,47 +243,40 @@ app.post('/api/admin/rooms', (req, res) => {
 
 app.put('/api/admin/rooms/:id', (req, res) => {
     const { name, capacity, facilities } = req.body;
+
     db.query(
         'UPDATE rooms SET name=?, capacity=?, facilities=? WHERE id=?',
         [name, capacity, facilities, req.params.id],
         err => {
-            if (err) return res.json({ success: false });
+            if (err) return res.json({ success: false, message: err.message });
             return res.json({ success: true });
         }
     );
 });
 
 app.delete('/api/admin/rooms/:id', (req, res) => {
-    // Delete bookings for this room first
-    db.query('DELETE FROM bookings WHERE room_id=?', [req.params.id], () => {
-        db.query('DELETE FROM rooms WHERE id=?', [req.params.id], err => {
-            if (err) return res.json({ success: false });
+    db.query('DELETE FROM bookings WHERE room_id=?', [req.params.id], err => {
+        if (err) return res.json({ success: false });
+        db.query('DELETE FROM rooms WHERE id=?', [req.params.id], err2 => {
+            if (err2) return res.json({ success: false });
             return res.json({ success: true });
         });
     });
 });
 
-app.get('/api/admin/users', (req, res) => {
-    db.query('SELECT * FROM users', (err, rows) => {
-        if (err) return res.json([]);
-        return res.json(rows);
-    });
+// ===== ADD =====
+process.on('uncaughtException', err => {
+    console.error('❌ Uncaught:', err);
+});
+process.on('unhandledRejection', err => {
+    console.error('❌ Rejection:', err);
 });
 
-app.delete('/api/admin/users/:id', (req, res) => {
-    db.query('DELETE FROM bookings WHERE user_id=?', [req.params.id], () => {
-        db.query('DELETE FROM users WHERE id=?', [req.params.id], err => {
-            if (err) return res.json({ success: false });
-            return res.json({ success: true });
-        });
-    });
-});
-
-// --- SERVER START ---
+// ===== FIX FOR RENDER (ADD ONLY) =====
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🚀 Server Ready at http://localhost:${PORT}`);
 });
