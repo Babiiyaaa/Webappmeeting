@@ -28,9 +28,8 @@
 </head>
 <body class="h-screen overflow-hidden text-gray-700 bg-gray-50">
     <script>
-        // เปลี่ยน URL ตาม Environment ของคุณ
+        // ใช้ URL Online เพื่อดึงข้อมูลเก่ากลับมา
         const API_BASE_URL = 'https://webappmeeting-fixenv.onrender.com/api'; 
-        //const API_BASE_URL = 'http://localhost:3000/api'; 
     </script>
     
     <!-- LOGIN SCREEN -->
@@ -469,6 +468,7 @@
             const myBookings = allBookings.filter(b => b.user_id === currentUser.id);
             const pendingCount = allBookings.filter(b => b.status === 'pending').length;
             const now = new Date();
+            const isAdmin = currentUser.role === 'admin';
             
             const nextMeeting = myBookings
                 .filter(b => b.status === 'approved' && new Date(b.start_time) > now)
@@ -476,68 +476,71 @@
 
             let html = `<div class="fade-in max-w-6xl mx-auto space-y-6">`;
             
+            html += `<div class="grid grid-cols-1 ${isAdmin ? 'lg:grid-cols-3' : 'lg:grid-cols-1'} gap-6">`;
+            
             html += `
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div class="lg:col-span-2 bg-gradient-to-r from-indigo-600 to-blue-600 rounded-3xl p-6 lg:p-8 text-white shadow-xl relative overflow-hidden">
-                        <div class="relative z-10">
-                            <h2 class="text-2xl lg:text-3xl font-bold mb-2">สวัสดี, คุณ${currentUser.fullname.split(' ')[0]} 👋</h2>
-                            <p class="text-indigo-100 mb-6 lg:mb-8">จัดการการประชุมของคุณได้ง่ายๆ ที่นี่</p>
-                            
-                            ${nextMeeting ? `
-                                <div class="bg-white/10 backdrop-blur-md rounded-2xl p-4 lg:p-6 border border-white/20">
-                                    <div class="flex items-center gap-3 mb-2 text-indigo-200 text-xs font-bold uppercase tracking-wider">
-                                        <i class="fas fa-calendar-day"></i> การประชุมถัดไป
-                                    </div>
-                                    <h3 class="text-xl lg:text-2xl font-bold mb-2 truncate">${nextMeeting.topic}</h3>
-                                    <div class="flex flex-wrap gap-4 text-sm">
-                                        <span class="flex items-center gap-2"><i class="far fa-clock"></i> ${new Date(nextMeeting.start_time).toLocaleTimeString('th-TH', {hour:'2-digit',minute:'2-digit'})}</span>
-                                        <span class="flex items-center gap-2"><i class="fas fa-map-marker-alt"></i> ${nextMeeting.room_name}</span>
-                                    </div>
+                <div class="${isAdmin ? 'lg:col-span-2' : ''} bg-gradient-to-r from-indigo-600 to-blue-600 rounded-3xl p-6 lg:p-8 text-white shadow-xl relative overflow-hidden">
+                    <div class="relative z-10">
+                        <h2 class="text-2xl lg:text-3xl font-bold mb-2">สวัสดี, คุณ${currentUser.fullname.split(' ')[0]} 👋</h2>
+                        <p class="text-indigo-100 mb-6 lg:mb-8">จัดการการประชุมของคุณได้ง่ายๆ ที่นี่</p>
+                        
+                        ${nextMeeting ? `
+                            <div class="bg-white/10 backdrop-blur-md rounded-2xl p-4 lg:p-6 border border-white/20 inline-block w-full lg:w-auto min-w-[300px]">
+                                <div class="flex items-center gap-3 mb-2 text-indigo-200 text-xs font-bold uppercase tracking-wider">
+                                    <i class="fas fa-calendar-day"></i> การประชุมถัดไป
                                 </div>
-                            ` : `
-                                <div class="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 flex items-center gap-4">
-                                    <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center text-xl">☕</div>
-                                    <div>
-                                        <h3 class="font-bold text-lg">ไม่มีนัดหมายเร็วๆ นี้</h3>
-                                        <p class="text-sm text-indigo-100">คุณว่าง! จองห้องประชุมได้เลย</p>
-                                    </div>
+                                <h3 class="text-xl lg:text-2xl font-bold mb-2 truncate">${nextMeeting.topic}</h3>
+                                <div class="flex flex-wrap gap-4 text-sm">
+                                    <span class="flex items-center gap-2"><i class="far fa-clock"></i> ${new Date(nextMeeting.start_time).toLocaleTimeString('th-TH', {hour:'2-digit',minute:'2-digit'})}</span>
+                                    <span class="flex items-center gap-2"><i class="fas fa-map-marker-alt"></i> ${nextMeeting.room_name}</span>
                                 </div>
-                            `}
-                        </div>
-                        <div class="absolute right-0 top-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/4 blur-3xl"></div>
+                            </div>
+                        ` : `
+                            <div class="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 flex items-center gap-4 inline-flex">
+                                <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center text-xl">☕</div>
+                                <div>
+                                    <h3 class="font-bold text-lg">ไม่มีนัดหมายเร็วๆ นี้</h3>
+                                    <p class="text-sm text-indigo-100">คุณว่าง! จองห้องประชุมได้เลย</p>
+                                </div>
+                            </div>
+                        `}
                     </div>
-                    
-                    <div class="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex flex-col justify-center">
-                        <h4 class="font-bold text-gray-700 mb-4">สถานะวันนี้</h4>
-                        <div class="space-y-4">
-                            <div class="flex items-center justify-between p-3 bg-green-50 rounded-xl">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 bg-green-100 text-green-600 rounded-lg flex items-center justify-center"><i class="fas fa-check"></i></div>
-                                    <div>
-                                        <p class="text-xs text-gray-500 font-bold">อนุมัติแล้ว</p>
-                                        <p class="font-bold text-gray-800">${myBookings.filter(b=>b.status==='approved').length} รายการ</p>
-                                    </div>
+                    <div class="absolute right-0 top-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/4 blur-3xl"></div>
+                </div>`;
+            
+            if (isAdmin) {
+                html += `
+                <div class="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex flex-col justify-center">
+                    <h4 class="font-bold text-gray-700 mb-4">สถานะวันนี้</h4>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between p-3 bg-green-50 rounded-xl">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-green-100 text-green-600 rounded-lg flex items-center justify-center"><i class="fas fa-check"></i></div>
+                                <div>
+                                    <p class="text-xs text-gray-500 font-bold">อนุมัติแล้ว</p>
+                                    <p class="font-bold text-gray-800">${myBookings.filter(b=>b.status==='approved').length} รายการ</p>
                                 </div>
                             </div>
-                            <div class="flex items-center justify-between p-3 bg-orange-50 rounded-xl">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center"><i class="fas fa-clock"></i></div>
-                                    <div>
-                                        <p class="text-xs text-gray-500 font-bold">รออนุมัติ</p>
-                                        <p class="font-bold text-gray-800">${myBookings.filter(b=>b.status==='pending').length} รายการ</p>
-                                    </div>
+                        </div>
+                        <div class="flex items-center justify-between p-3 bg-orange-50 rounded-xl">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center"><i class="fas fa-clock"></i></div>
+                                <div>
+                                    <p class="text-xs text-gray-500 font-bold">รออนุมัติ</p>
+                                    <p class="font-bold text-gray-800">${myBookings.filter(b=>b.status==='pending').length} รายการ</p>
                                 </div>
                             </div>
-                            ${currentUser.role === 'admin' ? `
-                            <div class="p-3 bg-slate-900 text-white rounded-xl text-center cursor-pointer hover:bg-slate-800 transition" onclick="renderPage('approve')">
-                                <p class="text-xs text-gray-400">ADMIN PANEL</p>
-                                <p class="font-bold">รอคุณอนุมัติ ${pendingCount} รายการ</p>
-                            </div>` : ''}
+                        </div>
+                        <div class="p-3 bg-slate-900 text-white rounded-xl text-center cursor-pointer hover:bg-slate-800 transition" onclick="renderPage('approve')">
+                            <p class="text-xs text-gray-400">ADMIN PANEL</p>
+                            <p class="font-bold">รอคุณอนุมัติ ${pendingCount} รายการ</p>
                         </div>
                     </div>
                 </div>`;
+            }
+
+            html += `</div>`; 
             
-            // Recent Table
             html += `
                 <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
                     <div class="p-6 border-b flex justify-between items-center">
@@ -575,6 +578,81 @@
             $('contentArea').innerHTML = html;
         }
 
+        function renderCalendarPage() {
+            $('contentArea').innerHTML = `
+                <div class="bg-white p-2 lg:p-4 rounded-3xl shadow-sm border h-[calc(100vh-140px)] fade-in flex flex-col">
+                    <div id="calendar" class="flex-1"></div>
+                </div>`;
+            
+            let displayEvents = allBookings;
+            if (currentUser.role !== 'admin') {
+                displayEvents = allBookings.filter(b => b.user_id === currentUser.id);
+            }
+
+            const events = displayEvents.map(b => {
+                const isMine = b.user_id === currentUser.id;
+                let color = '#9ca3af'; 
+                
+                if (b.status === 'approved') {
+                    color = isMine ? '#4f46e5' : '#10b981'; 
+                } else if (b.status === 'pending') {
+                    color = '#f59e0b';
+                } else if (b.status === 'rejected') {
+                    color = '#ef4444'; 
+                }
+
+                return {
+                    id: b.id,
+                    title: `${b.topic} (${b.room_name})`,
+                    start: b.start_time,
+                    end: b.end_time,
+                    backgroundColor: color,
+                    borderColor: 'transparent',
+                    extendedProps: { 
+                        status: b.status, 
+                        user: b.fullname, 
+                        room: b.room_name,
+                        isMine: isMine 
+                    }
+                };
+            });
+
+            setTimeout(() => {
+                const calendarEl = document.getElementById('calendar');
+                const calendar = new FullCalendar.Calendar(calendarEl, {
+                    initialView: window.innerWidth < 768 ? 'listWeek' : 'timeGridWeek',
+                    locale: 'th',
+                    headerToolbar: { 
+                        left: 'prev,next', 
+                        center: 'title', 
+                        right: 'dayGridMonth,timeGridWeek,listWeek' 
+                    },
+                    events: events,
+                    height: '100%',
+                    slotMinTime: '08:00:00',
+                    slotMaxTime: '19:00:00',
+                    allDaySlot: false,
+                    expandRows: true,
+                    eventClick: function(info) {
+                        const props = info.event.extendedProps;
+                        Swal.fire({
+                            title: info.event.title,
+                            html: `
+                                <div class="text-left text-sm">
+                                    <p><b>ผู้จอง:</b> ${props.user}</p>
+                                    <p><b>ห้อง:</b> ${props.room}</p>
+                                    <p><b>เวลา:</b> ${info.event.start.toLocaleTimeString('th-TH')} - ${info.event.end.toLocaleTimeString('th-TH')}</p>
+                                    <p><b>สถานะ:</b> ${props.status}</p>
+                                </div>
+                            `,
+                            icon: 'info'
+                        });
+                    }
+                });
+                calendar.render();
+            }, 100);
+        }
+        
         function renderProfile() {
             const avatarUrl = currentUser.avatar && currentUser.avatar !== 'default.png' 
                 ? `${API_BASE_URL.replace('/api','')}/uploads/${currentUser.avatar}` 
@@ -646,76 +724,6 @@
                     Swal.fire('Error', 'อัปเดตไม่สำเร็จ', 'error');
                 }
             } catch(err) { Swal.fire('Error', 'Connection Error', 'error'); }
-        }
-
-        function renderCalendarPage() {
-            $('contentArea').innerHTML = `
-                <div class="bg-white p-2 lg:p-4 rounded-3xl shadow-sm border h-[calc(100vh-140px)] fade-in flex flex-col">
-                    <div id="calendar" class="flex-1"></div>
-                </div>`;
-            
-            const events = allBookings.map(b => {
-                const isMine = b.user_id === currentUser.id;
-                let color = '#9ca3af'; // Default gray for others
-                
-                if (b.status === 'approved') {
-                    color = isMine ? '#4f46e5' : '#10b981'; 
-                } else if (b.status === 'pending') {
-                    color = '#f59e0b';
-                } else if (b.status === 'rejected') {
-                    color = '#ef4444'; 
-                }
-
-                return {
-                    id: b.id,
-                    title: `${b.topic} (${b.room_name})`,
-                    start: b.start_time,
-                    end: b.end_time,
-                    backgroundColor: color,
-                    borderColor: 'transparent',
-                    extendedProps: { 
-                        status: b.status, 
-                        user: b.fullname, 
-                        room: b.room_name,
-                        isMine: isMine 
-                    }
-                };
-            });
-
-            setTimeout(() => {
-                const calendarEl = document.getElementById('calendar');
-                const calendar = new FullCalendar.Calendar(calendarEl, {
-                    initialView: window.innerWidth < 768 ? 'listWeek' : 'timeGridWeek',
-                    locale: 'th',
-                    headerToolbar: { 
-                        left: 'prev,next', 
-                        center: 'title', 
-                        right: 'dayGridMonth,timeGridWeek,listWeek' 
-                    },
-                    events: events,
-                    height: '100%',
-                    slotMinTime: '08:00:00',
-                    slotMaxTime: '19:00:00',
-                    allDaySlot: false,
-                    expandRows: true,
-                    eventClick: function(info) {
-                        const props = info.event.extendedProps;
-                        Swal.fire({
-                            title: info.event.title,
-                            html: `
-                                <div class="text-left text-sm">
-                                    <p><b>ผู้จอง:</b> ${props.user}</p>
-                                    <p><b>ห้อง:</b> ${props.room}</p>
-                                    <p><b>เวลา:</b> ${info.event.start.toLocaleTimeString('th-TH')} - ${info.event.end.toLocaleTimeString('th-TH')}</p>
-                                    <p><b>สถานะ:</b> ${props.status}</p>
-                                </div>
-                            `,
-                            icon: 'info'
-                        });
-                    }
-                });
-                calendar.render();
-            }, 100);
         }
 
         async function renderHistory() {
