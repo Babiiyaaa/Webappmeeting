@@ -36,7 +36,7 @@ const upload = multer({
 });
 
 // ==========================================
-// 🔵 เชื่อมต่อ Cloud Database (Aiven) ข้อมูลเดิมจะกลับมา
+// 🔵 เชื่อมต่อ Cloud Database (Aiven)
 // ==========================================
 const db = mysql.createPool({
     host: process.env.DB_HOST || 'mysql-2243ea6c-smartmeeting.j.aivencloud.com',
@@ -47,18 +47,29 @@ const db = mysql.createPool({
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
-    ssl: { rejectUnauthorized: false }, // จำเป็นสำหรับ Aiven
-    timezone: '+07:00'
+    ssl: { rejectUnauthorized: false }, 
+    timezone: '+07:00' // ตั้งเวลาให้ตรงกับไทย
 });
 
 db.getConnection((err, connection) => {
     if (err) {
         console.error('❌ Cloud DB Connection Failed:', err.message);
     } else {
-        console.log('✅ Cloud DB Connected Successfully (ข้อมูลเก่ากลับมาแล้ว)');
+        console.log('✅ Cloud DB Connected Successfully');
         connection.release();
     }
 });
+
+// Helper: แปลงวันที่เป็น SQL Format (ป้องกันเวลาเพี้ยน)
+function toLocalSQLString(date) {
+    const pad = n => n < 10 ? '0' + n : n;
+    return date.getFullYear() + '-' + 
+           pad(date.getMonth() + 1) + '-' + 
+           pad(date.getDate()) + ' ' + 
+           pad(date.getHours()) + ':' + 
+           pad(date.getMinutes()) + ':' + 
+           pad(date.getSeconds());
+}
 
 // ================= API ROUTES =================
 
@@ -70,9 +81,9 @@ app.post('/api/register', (req, res) => {
         if (err) return res.status(500).json({ success: false, message: err.message });
         if (rows.length > 0) return res.json({ success: false, message: 'Username นี้ถูกใช้แล้ว' });
 
-        // ✅ FIX: ใส่ default.png ให้ avatar เสมอ
+        // ✅ FIX 1: เปลี่ยน "user" เป็น 'user' และใส่ default.png
         db.query(
-            'INSERT INTO users (username,password,fullname,email,role,avatar) VALUES (?,?,?,?, "user", "default.png")',
+            "INSERT INTO users (username,password,fullname,email,role,avatar) VALUES (?,?,?,?, 'user', 'default.png')",
             [username, password, fullname, email],
             err2 => {
                 if (err2) {
@@ -146,30 +157,20 @@ app.get('/api/bookings', (req, res) => {
     });
 });
 
-// Helper: Format Date for SQL (Fixes Booking Issue)
-function toLocalSQLString(date) {
-    const pad = n => n < 10 ? '0' + n : n;
-    return date.getFullYear() + '-' + 
-           pad(date.getMonth() + 1) + '-' + 
-           pad(date.getDate()) + ' ' + 
-           pad(date.getHours()) + ':' + 
-           pad(date.getMinutes()) + ':' + 
-           pad(date.getSeconds());
-}
-
 app.post('/api/book', upload.single('document'), (req, res) => {
     const { userId, roomId, start, topic, people, equipment } = req.body; 
     const file = req.file ? req.file.filename : null;
 
-    // ✅ FIX: Date Calculation & Formatting
+    // คำนวณเวลาเริ่มต้นและสิ้นสุด
     const startDate = new Date(start); 
-    const endDate = new Date(startDate.getTime() + (2 * 60 * 60 * 1000)); // +2 Hours
+    const endDate = new Date(startDate.getTime() + (2 * 60 * 60 * 1000)); // ค่าเริ่มต้นจอง 2 ชม.
 
     const startSQL = toLocalSQLString(startDate);
     const endSQL = toLocalSQLString(endDate);
 
+    // ✅ FIX 2: เปลี่ยน "pending" เป็น 'pending' และเพิ่ม attendees, equipment
     db.query(
-        'INSERT INTO bookings (user_id, room_id, start_time, end_time, topic, status, document, attendees, equipment) VALUES (?,?,?,?,?, "pending", ?, ?, ?)',
+        "INSERT INTO bookings (user_id, room_id, start_time, end_time, topic, status, document, attendees, equipment) VALUES (?,?,?,?, ?, 'pending', ?, ?, ?)",
         [userId, roomId, startSQL, endSQL, topic, file, people || 5, equipment || ''],
         err => {
             if (err) {
